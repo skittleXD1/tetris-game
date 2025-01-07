@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetris Game</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #222;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 4px solid white;
+            background-color: #000;
+        }
+        .info {
+            display: flex;
+            justify-content: space-between;
+            width: 360px;
+            margin-bottom: 10px;
+        }
+        .next, .score {
+            font-size: 18px;
+        }
+        .next {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .next canvas {
+            margin-top: 10px;
+            background-color: #000;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <div class="score">Score: <span id="score">0</span></div>
+        <div class="next">Next:
+            <canvas id="nextCanvas" width="120" height="120"></canvas>
+        </div>
+    </div>
+    <canvas id="gameCanvas" width="300" height="600"></canvas>
+
+    <script>
+        const gameCanvas = document.getElementById('gameCanvas');
+        const nextCanvas = document.getElementById('nextCanvas');
+        const ctx = gameCanvas.getContext('2d');
+        const nextCtx = nextCanvas.getContext('2d');
+
+        const blockSize = 30; // Block size in pixels
+        const rows = 20; // Number of rows
+        const cols = 10; // Number of columns
+        const board = Array.from({ length: rows }, () => Array(cols).fill(0));
+
+        const tetriminos = [
+            { shape: [[1, 1, 1, 1]], color: 'cyan' }, // I shape
+            { shape: [[1, 1], [1, 1]], color: 'yellow' }, // O shape
+            { shape: [[0, 1, 0], [1, 1, 1]], color: 'purple' }, // T shape
+            { shape: [[0, 1, 1], [1, 1, 0]], color: 'green' }, // S shape
+            { shape: [[1, 1, 0], [0, 1, 1]], color: 'red' }, // Z shape
+            { shape: [[1, 0, 0], [1, 1, 1]], color: 'blue' }, // J shape
+            { shape: [[0, 0, 1], [1, 1, 1]], color: 'orange' } // L shape
+        ];
+
+        let currentTetrimino, currentPos, nextTetrimino;
+        let score = 0;
+        let gameInterval;
+
+        // Initialize the game
+        function initGame() {
+            score = 0;
+            currentTetrimino = getRandomTetrimino();
+            nextTetrimino = getRandomTetrimino();
+            currentPos = { x: Math.floor(cols / 2) - 1, y: 0 };
+            gameInterval = setInterval(updateGame, 300);
+            drawBoard();
+            drawNext();
+        }
+
+        function drawBoard() {
+            ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+
+            // Draw the board
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    if (board[row][col]) {
+                        ctx.fillStyle = board[row][col];
+                        ctx.fillRect(col * blockSize, row * blockSize, blockSize, blockSize);
+                    }
+                }
+            }
+
+            // Draw the current Tetrimino
+            drawTetrimino(currentTetrimino, currentPos, ctx);
+        }
+
+        function drawNext() {
+            nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+            drawTetrimino(nextTetrimino, { x: 1, y: 1 }, nextCtx);
+        }
+
+        function drawTetrimino(tetrimino, pos, context) {
+            context.fillStyle = tetrimino.color;
+            tetrimino.shape.forEach((row, rowIndex) => {
+                row.forEach((cell, colIndex) => {
+                    if (cell) {
+                        context.fillRect((pos.x + colIndex) * blockSize, (pos.y + rowIndex) * blockSize, blockSize, blockSize);
+                    }
+                });
+            });
+        }
+
+        function getRandomTetrimino() {
+            return tetriminos[Math.floor(Math.random() * tetriminos.length)];
+        }
+
+        function updateGame() {
+            currentPos.y++;
+            if (checkCollision()) {
+                currentPos.y--;
+                placeTetrimino();
+                clearLines();
+                currentTetrimino = nextTetrimino;
+                nextTetrimino = getRandomTetrimino();
+                currentPos = { x: Math.floor(cols / 2) - 1, y: 0 };
+                drawNext();
+
+                if (checkCollision()) {
+                    alert('Game Over! Final Score: ' + score);
+                    clearInterval(gameInterval);
+                }
+            }
+            drawBoard();
+        }
+
+        function checkCollision() {
+            return currentTetrimino.shape.some((row, rowIndex) =>
+                row.some((cell, colIndex) => {
+                    if (cell) {
+                        const x = currentPos.x + colIndex;
+                        const y = currentPos.y + rowIndex;
+                        return x < 0 || x >= cols || y >= rows || (y >= 0 && board[y][x]);
+                    }
+                })
+            );
+        }
+
+        function placeTetrimino() {
+            currentTetrimino.shape.forEach((row, rowIndex) => {
+                row.forEach((cell, colIndex) => {
+                    if (cell) {
+                        const x = currentPos.x + colIndex;
+                        const y = currentPos.y + rowIndex;
+                        board[y][x] = currentTetrimino.color;
+                    }
+                });
+            });
+        }
+
+        function clearLines() {
+            for (let row = rows - 1; row >= 0; row--) {
+                if (board[row].every(cell => cell)) {
+                    board.splice(row, 1);
+                    board.unshift(Array(cols).fill(0));
+                    score += 10;
+                    document.getElementById('score').textContent = score;
+                }
+            }
+        }
+
+        function handleInput(e) {
+            if (e.key === 'ArrowLeft') {
+                currentPos.x--;
+                if (checkCollision()) currentPos.x++;
+            } else if (e.key === 'ArrowRight') {
+                currentPos.x++;
+                if (checkCollision()) currentPos.x--;
+            } else if (e.key === 'ArrowDown') {
+                updateGame();
+            } else if (e.key === 'ArrowUp') {
+                rotateTetrimino();
+            }
+            drawBoard();
+        }
+
+        function rotateTetrimino() {
+            const tempShape = currentTetrimino.shape.map((row, i) => row.map((_, j) => currentTetrimino.shape[j][i])).reverse();
+            const oldShape = currentTetrimino.shape;
+            currentTetrimino.shape = tempShape;
+            if (checkCollision()) {
+                currentTetrimino.shape = oldShape;
+            }
+        }
+
+        document.addEventListener('keydown', handleInput);
+        window.onload = initGame;
+    </script>
+</body>
+</html>
